@@ -48,10 +48,10 @@ colors:
 
 # Data File Paths
 data_files:
-  zones: "data/TAZ.geojson"
-  base_scenario: "data/Base Scenario.parquet"
-  node_mapping: "data/Lagos_Node.xlsx"
-  lgas: "data/LGAs.geojson"
+  zones: "Data/TAZ.geojson"
+  base_scenario: "Data/Base Scenario.parquet"
+  node_mapping: "Data/Lagos_Node.xlsx"
+  lgas: "Data/LGAs.geojson"
 
 # UI Settings
 ui:
