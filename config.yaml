@@ -1,0 +1,83 @@
+# Lagos Accessibility Dashboard Configuration
+# This file contains all configurable parameters for the dashboard
+# Version: 2.0 - Enhanced with validation and better organization
+
+# Map Configuration
+default_center: [6.5244, 3.3792]  # Lagos center coordinates (lat, lon)
+default_zoom: 11
+map_height: 750
+
+# Analysis Configuration
+time_thresholds: [15, 30, 45, 60, 90, 120]  # Available time thresholds in minutes
+default_time_threshold: 45
+default_time_band: 15  # For time mapping analysis
+
+# Export Settings
+export_formats: ["png", "html", "csv"]
+max_file_size_mb: 50
+export_quality: "high"  # Options: low, medium, high
+
+# Performance & Caching
+cache_ttl_hours: 2  # Increased cache time
+batch_size: 10000
+geometry_simplification: 0.0005  # Increased for faster rendering
+enable_performance_monitoring: false
+initial_load_timeout: 30  # Seconds
+chunk_size: 5000  # For processing large datasets
+
+# Enhanced Color Schemes with better accessibility
+colors:
+  time_mapping:
+    0_15: "#e3f2fd"      # Very light blue (closest)
+    15_30: "#90caf9"     # Light blue
+    30_45: "#42a5f5"     # Medium blue
+    45_60: "#1976d2"     # Dark blue
+    60_plus: "#0d47a1"   # Very dark blue (farthest)
+  accessibility:
+    low: "#fee5d9"       # Light red
+    medium_low: "#fcae91"
+    medium: "#fb6a4a"
+    medium_high: "#de2d26"
+    high: "#a50f15"      # Dark red
+  time_diff:
+    significant_improvement: "#1a9850"  # Dark green
+    minor_improvement: "#91cf60"       # Light green
+    no_change: "#ffffbf"               # Yellow
+    minor_increase: "#fc8d59"          # Orange
+    significant_increase: "#d73027"    # Red
+
+# Data File Paths
+data_files:
+  zones: "data/TAZ.geojson"
+  base_scenario: "data/Base Scenario.parquet"
+  node_mapping: "data/Lagos_Node.xlsx"
+  lgas: "data/LGAs.geojson"
+
+# UI Settings
+ui:
+  sidebar_width: 300
+  show_debug_info: false  # Set to true for development
+  enable_tooltips: true
+  animation_duration: 300  # milliseconds
+  
+# Map Display Settings
+map_display:
+  default_opacity: 0.7
+  default_border_weight: 0.5
+  highlight_opacity: 0.9
+  highlight_border_weight: 3.0
+  
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "lagos_dashboard.log"
+  max_file_size_mb: 10
+  backup_count: 3
+
+# Feature Flags
+features:
+  enable_scenario_comparison: true
+  enable_time_mapping: true
+  enable_export: true
+  enable_lga_boundaries: true
+  enable_zone_labels: true 
