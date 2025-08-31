@@ -1,28 +1,13 @@
-# Core Streamlit and Data Processing (optimized versions)
-streamlit>=1.28.0,<2.0.0
-pandas>=2.0.0,<3.0.0
-numpy>=1.24.0,<2.0.0
-geopandas>=0.13.0,<1.0.0
-
-# Mapping and Visualization
-folium>=0.14.0,<1.0.0
-streamlit-folium>=0.13.0,<1.0.0
-branca>=0.6.0,<1.0.0
-
-# Excel File Processing (optimized for performance)
-openpyxl>=3.1.0,<4.0.0
-xlrd>=2.0.0,<3.0.0
-
-# Web Scraping and Export (optional - only load if needed)
-selenium>=4.15.0,<5.0.0
-webdriver-manager>=4.0.0,<5.0.0
-
-# Configuration and Utilities
-pyyaml>=6.0.0,<7.0.0
-psutil>=5.9.0,<6.0.0  # System monitoring for debug mode
-
-# Performance optimizations
-pyarrow>=12.0.0  # Faster data I/O and Parquet support
-fastparquet>=0.8.0  # Alternative fast file format (backup option)
-
-# Note: For production, consider using conda-forge or pre-compiled wheels for faster installation
+# Deployment requirements - streamlined for cloud hosting
+streamlit
+pandas
+numpy
+geopandas
+folium
+streamlit-folium
+branca
+openpyxl
+xlrd
+pyyaml
+psutil
+pyarrow
