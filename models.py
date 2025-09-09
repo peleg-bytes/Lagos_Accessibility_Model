@@ -58,11 +58,11 @@ class AppConfig:
     # Color schemes
     color_schemes: Dict[str, Dict[str, str]] = field(default_factory=lambda: {
         "time_mapping": {
-            "0_15": "#e3f2fd",
-            "15_30": "#90caf9",
-            "30_45": "#42a5f5",
-            "45_60": "#1976d2",
-            "60_plus": "#0d47a1"
+            "0_15": "#00ff00",      # Bright green - very short travel time
+            "15_30": "#ffff00",     # Bright yellow - short travel time
+            "30_45": "#ff8000",     # Orange - medium travel time
+            "45_60": "#ff0000",     # Red - long travel time
+            "60_plus": "#800080"    # Purple - very long travel time
         },
         "accessibility": {
             "low": "#fee5d9",

@@ -9,18 +9,19 @@ import math
 from typing import List, Tuple, Optional, Dict, Any
 import logging
 from branca.element import Template, MacroElement
+import streamlit as st
 
 from models import AppConfig, AnalysisConfig, MapConfig, ATTRIBUTE_METADATA
 
 logger = logging.getLogger(__name__)
 
-# Default time mapping color scheme fallback
+# Default time mapping color scheme fallback - High contrast colors
 DEFAULT_TIME_MAPPING_SCHEME: Dict[str, str] = {
-    "0_15": "#e3f2fd",
-    "15_30": "#90caf9",
-    "30_45": "#42a5f5",
-    "45_60": "#1976d2",
-    "60_plus": "#0d47a1",
+    "0_15": "#00ff00",      # Bright green - very short travel time
+    "15_30": "#ffff00",     # Bright yellow - short travel time
+    "30_45": "#ff8000",     # Orange - medium travel time
+    "45_60": "#ff0000",     # Red - long travel time
+    "60_plus": "#800080",   # Purple - very long travel time
 }
 
 def ensure_time_mapping_keys(color_scheme: Dict[str, str]) -> Dict[str, str]:
@@ -220,8 +221,9 @@ def assign_time_mapping_colors(zones_df: gpd.GeoDataFrame, total_col: str, color
         
     return zones_df, bins, colors
 
+@st.cache_data(ttl=300)  # Cache for 5 minutes to speed up zone clicks
 def color_zones_by_origin_travel_time(
-    zones_df: gpd.GeoDataFrame,
+    _zones_df: gpd.GeoDataFrame,
     skim_df: pd.DataFrame,
     origin_zone: int,
     time_band: int,
@@ -235,7 +237,7 @@ def color_zones_by_origin_travel_time(
         scheme = ensure_time_mapping_keys(color_scheme)
         origin_zone = int(origin_zone)
         times = skim_df[skim_df["origin_zone"] == origin_zone][["destination_zone", "travel_time"]]
-        merged = zones_df.merge(
+        merged = _zones_df.merge(
             times, left_on="ZONE_ID", right_on="destination_zone", how="left"
         )
         
@@ -318,7 +320,7 @@ def color_zones_by_origin_travel_time(
         return merged
     except Exception as e:
         logger.error(f"Failed to color zones by origin travel time: {e}")
-        return zones_df
+        return _zones_df
 
 def generate_dynamic_color_palette(base_scheme: Dict[str, str], num_classes: int) -> List[str]:
     """Generate a smooth color palette with the specified number of classes.
@@ -385,20 +387,21 @@ def create_base_map(config: MapConfig) -> folium.Map:
     m = folium.Map(
         location=config.center, 
         zoom_start=config.zoom,
-        min_zoom=8,  # Prevent zooming out too much
+        min_zoom=5,  # Allow more zoom out capability for better overview
         max_zoom=18,  # Allow more detailed zoom levels
         world_copy_jump=False,  # Disable world wrapping
         no_wrap=True,  # Prevent horizontal wrapping
         zoom_delta=0.5,  # Smaller zoom increments (default is 1)
         wheel_debounce_time=40,  # Reduce wheel sensitivity (default is 40ms)
-        zoom_animation_threshold=4  # Smoother zoom animations
+        zoom_animation_threshold=4,  # Smoother zoom animations
+        zoom_control=True,  # Explicitly enable zoom controls
+        scroll_wheel_zoom=True  # Explicitly enable scroll wheel zoom
     )
     
     # Add map controls
     Fullscreen().add_to(m)
     
-    # Add custom zoom control with finer increments
-    add_precise_zoom_control(m)
+    # Keep only default Folium zoom controls - remove custom ones to avoid overlap
     
     return m
 
@@ -720,146 +723,8 @@ def add_recenter_control(m: folium.Map, center: List[float], zoom: int, zones_gd
     m.get_root().html.add_child(folium.Element(recenter_html))
     logger.info(f"Added streamlit-safe recenter control using direct HTML approach")
 
-def add_precise_zoom_control(m: folium.Map):
-    """Add streamlit-safe zoom control using direct HTML approach like recenter button."""
-    try:
-        # Direct HTML approach - bypass Leaflet Control system entirely
-        zoom_html = f"""
-        <div id="precise-zoom-control" style="
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 1000;
-            background: white;
-            border-radius: 4px;
-            box-shadow: 0 1px 5px rgba(0,0,0,0.4);
-            overflow: hidden;
-        ">
-            <div id="zoom-in-btn" style="
-                width: 30px;
-                height: 30px;
-                line-height: 30px;
-                text-align: center;
-                cursor: pointer;
-                border-bottom: 1px solid #ccc;
-                font-size: 18px;
-                font-weight: bold;
-                user-select: none;
-                background: white;
-                color: #333;
-            " 
-            title="Zoom in (+0.5)"
-            onmouseover="this.style.backgroundColor='#f0f0f0'"
-            onmouseout="this.style.backgroundColor='white'"
-            onclick="
-                try {{
-                    var mapContainer = document.querySelector('.folium-map');
-                    if (!mapContainer) return;
-                    var mapId = mapContainer.id;
-                    var map = window[mapId];
-                    if (map && map.setZoom) {{
-                        var currentZoom = map.getZoom();
-                        var newZoom = Math.min(currentZoom + 0.5, map.getMaxZoom());
-                        map.setZoom(newZoom, {{animate: true}});
-                        console.log('Zoom in clicked, new zoom:', newZoom);
-                        
-                        // Visual feedback
-                        this.style.backgroundColor = '#e0e0e0';
-                        setTimeout(() => {{ this.style.backgroundColor = 'white'; }}, 100);
-                    }}
-                }} catch (error) {{
-                    console.error('Error in zoom in:', error);
-                }}
-            ">+</div>
-            
-            <div id="zoom-out-btn" style="
-                width: 30px;
-                height: 30px;
-                line-height: 30px;
-                text-align: center;
-                cursor: pointer;
-                font-size: 18px;
-                font-weight: bold;
-                user-select: none;
-                background: white;
-                color: #333;
-            " 
-            title="Zoom out (-0.5)"
-            onmouseover="this.style.backgroundColor='#f0f0f0'"
-            onmouseout="this.style.backgroundColor='white'"
-            onclick="
-                try {{
-                    var mapContainer = document.querySelector('.folium-map');
-                    if (!mapContainer) return;
-                    var mapId = mapContainer.id;
-                    var map = window[mapId];
-                    if (map && map.setZoom) {{
-                        var currentZoom = map.getZoom();
-                        var newZoom = Math.max(currentZoom - 0.5, map.getMinZoom());
-                        map.setZoom(newZoom, {{animate: true}});
-                        console.log('Zoom out clicked, new zoom:', newZoom);
-                        
-                        // Visual feedback
-                        this.style.backgroundColor = '#e0e0e0';
-                        setTimeout(() => {{ this.style.backgroundColor = 'white'; }}, 100);
-                    }}
-                }} catch (error) {{
-                    console.error('Error in zoom out:', error);
-                }}
-            ">−</div>
-        </div>
-        
-        <script>
-        // Enhanced wheel zoom with reduced sensitivity
-        setTimeout(function() {{
-            try {{
-                var mapContainer = document.querySelector('.folium-map');
-                if (!mapContainer) return;
-                
-                var mapId = mapContainer.id;
-                var map = window[mapId];
-                
-                if (map) {{
-                    // Disable default wheel zoom
-                    if (map.scrollWheelZoom) {{
-                        map.scrollWheelZoom.disable();
-                    }}
-                    
-                    // Add custom wheel zoom with reduced sensitivity
-                    mapContainer.addEventListener('wheel', function(e) {{
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        var delta = e.deltaY;
-                        var currentZoom = map.getZoom();
-                        var zoomIncrement = 0.25;
-                        
-                        if (delta < 0) {{
-                            // Zoom in
-                            var newZoom = Math.min(currentZoom + zoomIncrement, map.getMaxZoom());
-                            map.setZoom(newZoom, {{animate: true}});
-                        }} else if (delta > 0) {{
-                            // Zoom out
-                            var newZoom = Math.max(currentZoom - zoomIncrement, map.getMinZoom());
-                            map.setZoom(newZoom, {{animate: true}});
-                        }}
-                    }}, {{passive: false}});
-                    
-                    console.log('Enhanced wheel zoom with 0.25 increments enabled');
-                }}
-            }} catch (error) {{
-                console.error('Error setting up wheel zoom:', error);
-            }}
-        }}, 500);
-        </script>
-        """
-        
-        # Add the HTML directly to the map
-        m.get_root().html.add_child(folium.Element(zoom_html))
-        logger.info("Added streamlit-safe zoom control using direct HTML approach")
-        
-    except Exception as e:
-        logger.error(f"Failed to add precise zoom control: {e}")
+# Removed add_precise_zoom_control function - was causing non-working top-left zoom controls
+# Now using only default Folium zoom controls in bottom-right corner
 
 def add_map_bounds(m: folium.Map, sw: List[float], ne: List[float], viscosity: float = 0.8):
     """Restrict map panning to a bounding box and prevent endless horizontal scrolling.

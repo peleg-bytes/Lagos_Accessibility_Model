@@ -48,7 +48,7 @@ from map_utils import (
     assign_colors_to_zones,
     assign_time_mapping_colors,
     color_zones_by_origin_travel_time,
-    add_recenter_control,
+
     add_map_bounds,
     add_streamlit_safe_legend,
     add_compatibility_fixes
@@ -99,6 +99,13 @@ def initialize_session_state(config: AppConfig):
     
     if "clicked_zone_id" not in st.session_state:
         st.session_state.clicked_zone_id = None
+    
+    # Add map state preservation
+    if "map_center" not in st.session_state:
+        st.session_state.map_center = config.map_config.center
+    
+    if "map_zoom" not in st.session_state:
+        st.session_state.map_zoom = config.map_config.zoom
     
     if "scenario_file" not in st.session_state:
         st.session_state.scenario_file = None
@@ -156,7 +163,8 @@ def process_accessibility_data(zones, base_skim, scenario_skim, analysis_config)
 
 def create_map_layers(zones, analysis_config, map_config, lga_gdf, base_skim=None):
     """Create map with appropriate layers based on analysis type."""
-    # Create base map
+    # Create base map with default configuration
+    # No state preservation to prevent zoom/pan reloads
     m = create_base_map(map_config)
     
     # Create zones layer based on analysis type
@@ -216,7 +224,7 @@ def create_map_layers(zones, analysis_config, map_config, lga_gdf, base_skim=Non
     zones_layer.add_to(m)
     
     # Add enhanced controls with streamlit-folium compatibility fixes
-    add_recenter_control(m, map_config.center, map_config.zoom, zones)
+    # Removed recenter control as it was not working properly and causing confusion
     add_map_bounds(m, sw=[3.0, -5.0], ne=[15.0, 16.0], viscosity=0.8)
     add_compatibility_fixes(m)
     
@@ -487,32 +495,31 @@ def main():
     
     # Single consolidated loading process
     if 'app_fully_loaded' not in st.session_state:
-        with st.spinner("🚀 Loading Lagos Accessibility Dashboard..."):
-            # Setup configuration and styling
-            setup_page_config()
-            load_custom_css()
-            
-            # Load configuration
-            config = AppConfig.load_from_yaml()
-            
-            # Initialize session state
-            initialize_session_state(config)
-            
-            # Store config in session state
-            st.session_state.app_config = config
-            
-            # Load all data
-            zones, base_skim, node_to_taz = safe_load_data(config)
-            if zones is None or base_skim is None:
-                st.error("❌ Failed to load required data. Please check your data files.")
-                st.info("💡 **Tip**: Ensure all data files are in the correct directory and try refreshing the page.")
-                st.stop()
-            
-            # Cache everything in session state
-            st.session_state.zones = zones
-            st.session_state.base_skim = base_skim
-            st.session_state.node_to_taz = node_to_taz
-            st.session_state.app_fully_loaded = True
+        # Setup configuration and styling without spinner to avoid white overlay
+        setup_page_config()
+        load_custom_css()
+        
+        # Load configuration
+        config = AppConfig.load_from_yaml()
+        
+        # Initialize session state
+        initialize_session_state(config)
+        
+        # Store config in session state
+        st.session_state.app_config = config
+        
+        # Load all data
+        zones, base_skim, node_to_taz = safe_load_data(config)
+        if zones is None or base_skim is None:
+            st.error("❌ Failed to load required data. Please check your data files.")
+            st.info("💡 **Tip**: Ensure all data files are in the correct directory and try refreshing the page.")
+            st.stop()
+        
+        # Cache everything in session state
+        st.session_state.zones = zones
+        st.session_state.base_skim = base_skim
+        st.session_state.node_to_taz = node_to_taz
+        st.session_state.app_fully_loaded = True
     else:
         # Use cached data for instant subsequent loads
         config = st.session_state.app_config
@@ -567,6 +574,7 @@ def main():
     
     # Display map settings and get map configuration
     map_settings = display_map_settings()
+    
     map_config = MapConfig(
         center=config.map_config.center,
         zoom=config.map_config.zoom,
@@ -598,31 +606,56 @@ def main():
     # Create and display map
     m, zones = create_map_layers(zones, analysis_config, map_config, lga_gdf, base_skim)
     
-    # Display the map with enhanced key management to prevent element loss
-    # Include time_band in key to force refresh when time band changes
-    map_key = f"main_map_{analysis_config.analysis_type}_{analysis_config.clicked_zone_id}_{analysis_config.time_band}_{hash(str(analysis_config.view))}"
+    # Display the map with stable key to prevent unnecessary reloads
+    # Only change key when analysis type or view changes, not on zone clicks
+    map_key = f"main_map_{analysis_config.analysis_type}_{analysis_config.time_band}_{hash(str(analysis_config.view))}"
     logger.info(f"Using map key: {map_key}")
     clicked_data = st_folium(
         m,
         width=None,
         height=map_config.height,
-        returned_objects=["last_active_drawing"],
+        returned_objects=["last_active_drawing", "bounds", "center", "zoom"],
         key=map_key,
         # Force re-render to ensure custom elements are preserved
         use_container_width=True
     )
     
-    # Handle zone clicks
+    # Note: Map state preservation removed to prevent zoom/pan reloads
+    # The map will maintain its position naturally without session state updates
+    
+    # Handle zone clicks with map refresh for highlighting
     if clicked_data and clicked_data.get("last_active_drawing"):
         props = clicked_data["last_active_drawing"]["properties"]
         new_zone_id = props.get("ZONE_ID")
         if new_zone_id != st.session_state.analysis_config.clicked_zone_id:
+            # Update session state immediately
             st.session_state.analysis_config.clicked_zone_id = new_zone_id
             analysis_config.clicked_zone_id = new_zone_id
-            st.rerun()
+            
+            # Show feedback and refresh map to highlight selected zone
+            if analysis_config.analysis_type == "Time Mapping":
+                # Show loading message without spinner to avoid white overlay
+                st.info(f"🔄 Calculating travel times from Zone {new_zone_id}...")
+                st.rerun()
+            else:
+                # For Accessibility mode, just show toast - no rerun needed
+                st.toast(f"📍 Selected Zone {new_zone_id}", icon="✅")
+                # No rerun needed - the map will update automatically
 
     # Display zone information if a zone is clicked
     if analysis_config.clicked_zone_id:
+        # Add a smooth transition effect for zone info display
+        st.markdown("""
+        <style>
+        .zone-info-container {
+            animation: slideInFromTop 0.3s ease-out;
+        }
+        @keyframes slideInFromTop {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        </style>
+        """, unsafe_allow_html=True)
         display_zone_info(analysis_config.clicked_zone_id, zones, analysis_config, analysis_config.time_threshold)
     
     # Show detailed analysis for Time Mapping mode
